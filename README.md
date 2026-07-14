@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Панель мониторинга приложений с поддержкой ИИ, созданная с использованием Next.js и CopilotKit.
 
 ## Getting Started
 
