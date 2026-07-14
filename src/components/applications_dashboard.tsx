@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from "react";
 
+import { StatusChangeModal } from "@/components/status_change_modal";
+import {
+  ToastNotification,
+  type ToastKind,
+} from "@/components/toast_notification";
+
 import { initialApplications } from "@/data/applications";
 import type {
   ApplicationPriority,
@@ -53,12 +59,24 @@ function formatDate(date: string): string {
 }
 
 export function ApplicationsDashboard() {
-  const [applications] = useState(initialApplications);
+  const [applications, setApplications] = useState(initialApplications);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedApplicationId, setSelectedApplicationId] = useState(
     initialApplications[0].id,
   );
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+
+const [pendingStatus, setPendingStatus] = useState<ApplicationStatus>(
+  initialApplications[0].status,
+);
+
+const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+const [toast, setToast] = useState<{
+  message: string;
+  kind: ToastKind;
+} | null>(null);
 
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -93,6 +111,50 @@ export function ApplicationsDashboard() {
   const approvedAmount = applications
     .filter((application) => application.status === "approved")
     .reduce((total, application) => total + application.amount, 0);
+    function handleOpenStatusModal() {
+  setPendingStatus(selectedApplication.status);
+  setIsStatusModalOpen(true);
+}
+
+function handleCancelStatusChange() {
+  if (!isUpdatingStatus) {
+    setIsStatusModalOpen(false);
+  }
+}
+
+async function handleConfirmStatusChange() {
+  if (pendingStatus === selectedApplication.status) {
+    return;
+  }
+
+  const applicationId = selectedApplication.id;
+  const previousStatus = selectedApplication.status;
+
+  setIsUpdatingStatus(true);
+
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 700);
+  });
+
+  setApplications((currentApplications) =>
+    currentApplications.map((application) =>
+      application.id === applicationId
+        ? {
+            ...application,
+            status: pendingStatus,
+          }
+        : application,
+    ),
+  );
+
+  setIsUpdatingStatus(false);
+  setIsStatusModalOpen(false);
+
+  setToast({
+    kind: "success",
+    message: `Статус заявки #${applicationId} изменён: «${statusLabels[previousStatus]}» → «${statusLabels[pendingStatus]}».`,
+  });
+}
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -370,15 +432,36 @@ export function ApplicationsDashboard() {
               </div>
 
               <button
-                type="button"
-                className="mt-6 w-full rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-              >
-                Изменить статус
-              </button>
+              type="button"
+              onClick={handleOpenStatusModal}
+              className="mt-6 w-full rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Изменить статус
+            </button>
             </aside>
           </section>
         </main>
       </div>
+
+      <StatusChangeModal
+        isOpen={isStatusModalOpen}
+        applicationId={selectedApplication.id}
+        customerName={selectedApplication.customerName}
+        currentStatus={selectedApplication.status}
+        nextStatus={pendingStatus}
+        isSubmitting={isUpdatingStatus}
+        onNextStatusChange={setPendingStatus}
+        onCancel={handleCancelStatusChange}
+        onConfirm={handleConfirmStatusChange}
+      />
+
+      {toast ? (
+        <ToastNotification
+          message={toast.message}
+          kind={toast.kind}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
     </div>
   );
 }
