@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAgentContext } from "@copilotkit/react-core/v2";
 
 import {
   DashboardEmptyState,
@@ -15,6 +16,7 @@ import {
 
 import { initialApplications } from "@/data/applications";
 import type {
+  Application,
   ApplicationPriority,
   ApplicationStatus,
 } from "@/types/application";
@@ -65,6 +67,21 @@ function formatDate(date: string): string {
   return dateFormatter.format(new Date(`${date}T00:00:00`));
 }
 
+function toAgentApplication(application: Application) {
+  return {
+    id: application.id,
+    customerName: application.customerName,
+    companyName: application.companyName,
+    email: application.email,
+    phone: application.phone,
+    status: application.status,
+    priority: application.priority,
+    amount: application.amount,
+    createdAt: application.createdAt,
+    description: application.description,
+  };
+}
+
 export function ApplicationsDashboard() {
   const [applications, setApplications] = useState(initialApplications);
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,22 +125,49 @@ export function ApplicationsDashboard() {
   }, [applications, searchQuery, statusFilter]);
 
   const selectedApplication =
-    applications.find(
-      (application) => application.id === selectedApplicationId,
-    ) ?? applications[0];
+  applications.find(
+    (application) => application.id === selectedApplicationId,
+  ) ?? applications[0];
 
-  const newApplicationsCount = applications.filter(
-    (application) => application.status === "new",
-  ).length;
+const agentApplications = useMemo(
+  () => applications.map(toAgentApplication),
+  [applications],
+);
+
+const selectedApplicationForAgent = toAgentApplication(
+  selectedApplication,
+);
+
+useAgentContext({
+  description:
+    "Текущее состояние панели заявок АвтоСнаб. Все данные являются синтетическими. Допустимые статусы: new, in_review, approved, rejected.",
+  value: {
+    applications: agentApplications,
+    selectedApplication: selectedApplicationForAgent,
+    visibleApplicationIds: filteredApplications.map(
+      (application) => application.id,
+    ),
+    filters: {
+      searchQuery,
+      statusFilter,
+    },
+    dashboardViewState,
+  },
+});
+
+const newApplicationsCount = applications.filter(
+  (application) => application.status === "new",
+).length;
 
   const reviewApplicationsCount = applications.filter(
     (application) => application.status === "in_review",
   ).length;
 
-  const approvedAmount = applications
-    .filter((application) => application.status === "approved")
-    .reduce((total, application) => total + application.amount, 0);
-    function handleOpenStatusModal() {
+const approvedAmount = applications
+  .filter((application) => application.status === "approved")
+  .reduce((total, application) => total + application.amount, 0);
+
+function handleOpenStatusModal() {
   setPendingStatus(selectedApplication.status);
   setIsStatusModalOpen(true);
 }
@@ -343,10 +387,11 @@ function handleRestoreDashboard() {
             <DashboardEmptyState onRestore={handleRestoreDashboard} />
           ) : null}
 
-          <section className={`mt-6 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${
-                                dashboardViewState === "ready" ? "grid" : "hidden"
-                              }`}
-                            >
+          <section
+             className={`mt-6 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${
+               dashboardViewState === "ready" ? "grid" : "hidden"
+             }`}
+          >
             <article className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-400">Всего заявок</p>
               <p className="mt-3 text-3xl font-bold text-white">
@@ -371,10 +416,11 @@ function handleRestoreDashboard() {
             </article>
           </section>
 
-          <section className={`mt-6 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] ${
-                    dashboardViewState === "ready" ? "grid" : "hidden"
-                  }`}
-                >
+          <section
+             className={`mt-6 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] ${
+                dashboardViewState === "ready" ? "grid" : "hidden"
+             }`}
+          >
             <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5">
               <div className="grid gap-3 border-b border-white/10 p-4 sm:grid-cols-[minmax(0,1fr)_220px]">
                 <label>
@@ -548,10 +594,10 @@ function handleRestoreDashboard() {
               </div>
 
               <button
-              type="button"
-              onClick={handleOpenStatusModal}
-              className="mt-6 w-full rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-            >
+                type="button"
+                onClick={handleOpenStatusModal}
+                className="mt-6 w-full rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+              >
               Изменить статус
             </button>
             </aside>
