@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   waitFor,
@@ -42,6 +43,76 @@ describe("ApplicationsDashboard", () => {
       "requestStatusChange",
     ]);
   });
+
+  it("AI-инструмент filterApplications фильтрует заявки", async () => {
+  const approvedApplications = initialApplications.filter(
+    (application) => application.status === "approved",
+  );
+
+  expect(approvedApplications.length).toBeGreaterThan(0);
+
+  render(<ApplicationsDashboard />);
+
+  const filterTool = frontendTools.get("filterApplications");
+
+  expect(filterTool).toBeDefined();
+
+  let toolResult = "";
+
+  await act(async () => {
+    toolResult = await filterTool!.handler({
+      status: "approved",
+      query: "",
+    });
+  });
+
+  const parsedResult = JSON.parse(toolResult) as {
+    success: boolean;
+    status: string;
+    query: string;
+    matchedCount: number;
+    matchedApplicationIds: number[];
+  };
+
+  expect(parsedResult).toEqual({
+    success: true,
+    status: "approved",
+    query: "",
+    matchedCount: approvedApplications.length,
+    matchedApplicationIds: approvedApplications.map(
+      (application) => application.id,
+    ),
+  });
+
+  const statusSelect = screen.getByRole("combobox", {
+    name: "Фильтр по статусу",
+  });
+
+  expect(statusSelect).toHaveValue("approved");
+
+  for (const application of initialApplications) {
+    const applicationButton = screen.queryByRole("button", {
+      name: new RegExp(`#${application.id}\\b`),
+    });
+
+    if (application.status === "approved") {
+      expect(applicationButton).toBeInTheDocument();
+    } else {
+      expect(applicationButton).not.toBeInTheDocument();
+    }
+  }
+
+  const firstApprovedApplication = approvedApplications[0];
+
+  const firstApprovedButton = screen.getByRole("button", {
+    name: new RegExp(`#${firstApprovedApplication.id}\\b`),
+  });
+
+  expect(firstApprovedButton).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
 
   it("показывает заголовок и основные элементы панели заявок", () => {
     render(<ApplicationsDashboard />);
