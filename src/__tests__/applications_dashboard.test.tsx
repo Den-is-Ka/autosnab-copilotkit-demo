@@ -1,4 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,4 +101,100 @@ describe("ApplicationsDashboard", () => {
     screen.getByText(targetApplication.phone),
   ).toBeInTheDocument();
 });
+    it("меняет статус только после подтверждения пользователя", async () => {
+  const user = userEvent.setup();
+  const targetApplication = initialApplications[0];
+
+  const nextStatus =
+    targetApplication.status === "approved" ? "rejected" : "approved";
+
+  const currentStatusLabel =
+    targetApplication.status === "new"
+      ? "Новая"
+      : targetApplication.status === "in_review"
+        ? "На рассмотрении"
+        : targetApplication.status === "approved"
+          ? "Одобрена"
+          : "Отклонена";
+
+  const nextStatusLabel =
+    nextStatus === "approved" ? "Одобрена" : "Отклонена";
+
+  render(<ApplicationsDashboard />);
+
+  const applicationButton = screen.getByRole("button", {
+    name: new RegExp(`#${targetApplication.id}\\b`),
+  });
+
+  expect(
+    within(applicationButton).getByText(currentStatusLabel),
+  ).toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", {
+      name: "Изменить статус",
+    }),
+  );
+
+  const dialog = screen.getByRole("dialog", {
+    name: "Изменить статус заявки",
+  });
+
+  expect(dialog).toBeInTheDocument();
+
+  const statusSelect = within(dialog).getByRole("combobox", {
+    name: "Новый статус",
+  });
+
+  const confirmButton = within(dialog).getByRole("button", {
+    name: "Подтвердить изменение",
+  });
+
+  expect(statusSelect).toHaveValue(targetApplication.status);
+  expect(confirmButton).toBeDisabled();
+
+  await user.selectOptions(statusSelect, nextStatus);
+
+  expect(statusSelect).toHaveValue(nextStatus);
+  expect(confirmButton).toBeEnabled();
+
+  expect(
+    within(applicationButton).getByText(currentStatusLabel),
+  ).toBeInTheDocument();
+
+  expect(
+    within(applicationButton).queryByText(nextStatusLabel),
+  ).not.toBeInTheDocument();
+
+  await user.click(confirmButton);
+
+  expect(
+    within(dialog).getByRole("button", {
+      name: "Сохраняем...",
+    }),
+  ).toBeDisabled();
+
+  await waitFor(
+    () => {
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Изменить статус заявки",
+        }),
+      ).not.toBeInTheDocument();
+    },
+    {
+      timeout: 2000,
+    },
+  );
+
+  expect(
+    within(applicationButton).getByText(nextStatusLabel),
+  ).toBeInTheDocument();
+
+  expect(
+    within(applicationButton).queryByText(currentStatusLabel),
+  ).not.toBeInTheDocument();
+});
+
+
 
