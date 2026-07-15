@@ -68,3 +68,32 @@ describe("ApplicationsDashboard", () => {
         }
       }
     });
+    it("открывает выбранную заявку и показывает её данные", async () => {
+  const user = userEvent.setup();
+  const targetApplication = initialApplications[1];
+
+  render(<ApplicationsDashboard />);
+
+  const applicationButton = screen.getByRole("button", {
+    name: new RegExp(`#${targetApplication.id}\\b`),
+  });
+
+  expect(applicationButton).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(applicationButton);
+
+  expect(applicationButton).toHaveAttribute("aria-pressed", "true");
+
+  expect(
+    screen.getByText(`Заявка #${targetApplication.id}`),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText(targetApplication.email),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText(targetApplication.phone),
+  ).toBeInTheDocument();
+});
+
