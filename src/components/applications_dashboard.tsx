@@ -233,6 +233,108 @@ useFrontendTool(
   [applications, searchQuery, statusFilter],
 );
 
+useFrontendTool(
+  {
+    name: "selectApplication",
+    description:
+      "Открывает конкретную заявку АвтоСнаб по её числовому идентификатору. Используй идентификаторы заявок из контекста applications.",
+
+    parameters: z.object({
+      applicationId: z
+        .number()
+        .int()
+        .positive()
+        .describe("Числовой идентификатор заявки"),
+    }),
+
+    handler: async ({ applicationId }) => {
+      const application = applications.find(
+        (item) => item.id === applicationId,
+      );
+
+      if (!application) {
+        setToast({
+          kind: "error",
+          message: `Заявка #${applicationId} не найдена.`,
+        });
+
+        return JSON.stringify({
+          success: false,
+          applicationId,
+          error: "Application not found",
+        });
+      }
+
+      setDashboardViewState("ready");
+      setStatusFilter("all");
+      setSearchQuery("");
+      setSelectedApplicationId(application.id);
+
+      setToast({
+        kind: "info",
+        message: `Открыта заявка #${application.id}: ${application.customerName}.`,
+      });
+
+      return JSON.stringify({
+        success: true,
+        selectedApplication: toAgentApplication(application),
+      });
+    },
+  },
+  [applications],
+);
+
+useFrontendTool(
+  {
+    name: "selectApplication",
+    description:
+      "Открывает конкретную заявку АвтоСнаб по её числовому идентификатору. Используй идентификаторы заявок из контекста applications.",
+
+    parameters: z.object({
+      applicationId: z
+        .number()
+        .int()
+        .positive()
+        .describe("Числовой идентификатор заявки, например 1001"),
+    }),
+
+    handler: async ({ applicationId }) => {
+      const application = applications.find(
+        (item) => item.id === applicationId,
+      );
+
+      if (!application) {
+        setToast({
+          kind: "error",
+          message: `Заявка #${applicationId} не найдена.`,
+        });
+
+        return JSON.stringify({
+          success: false,
+          applicationId,
+          error: "Application not found",
+        });
+      }
+
+      setDashboardViewState("ready");
+      setStatusFilter("all");
+      setSearchQuery("");
+      setSelectedApplicationId(application.id);
+
+      setToast({
+        kind: "info",
+        message: `Открыта заявка #${application.id}: ${application.customerName}.`,
+      });
+
+      return JSON.stringify({
+        success: true,
+        selectedApplication: toAgentApplication(application),
+      });
+    },
+  },
+  [applications],
+);
+
 const newApplicationsCount = applications.filter(
   (application) => application.status === "new",
 ).length;
