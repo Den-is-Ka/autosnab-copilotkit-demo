@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAgentContext } from "@copilotkit/react-core/v2";
+
+import {
+  useAgentContext,
+  useFrontendTool,
+} from "@copilotkit/react-core/v2";
+import { z } from "zod";
 
 import {
   DashboardEmptyState,
@@ -154,6 +159,79 @@ useAgentContext({
     dashboardViewState,
   },
 });
+
+useFrontendTool(
+  {
+    name: "filterApplications",
+    description:
+      "Фильтрует заявки АвтоСнаб по статусу и поисковой строке. Поиск работает по имени клиента, названию компании и номеру заявки.",
+    parameters: z.object({
+      status: z
+        .enum(["all", "new", "in_review", "approved", "rejected"])
+        .optional()
+        .describe(
+          "Статус: all, new, in_review, approved или rejected",
+        ),
+
+      query: z
+        .string()
+        .optional()
+        .describe(
+          "Поисковая строка. Пустая строка очищает текстовый поиск.",
+        ),
+    }),
+
+    handler: async ({ status, query }) => {
+      const nextStatus: StatusFilter = status ?? statusFilter;
+      const nextQuery = query?.trim() ?? searchQuery;
+      const normalizedQuery = nextQuery.toLowerCase();
+
+      const matchingApplications = applications.filter((application) => {
+        const matchesStatus =
+          nextStatus === "all" || application.status === nextStatus;
+
+        const matchesSearch =
+          normalizedQuery.length === 0 ||
+          application.customerName
+            .toLowerCase()
+            .includes(normalizedQuery) ||
+          application.companyName
+            .toLowerCase()
+            .includes(normalizedQuery) ||
+          application.id.toString().includes(normalizedQuery);
+
+        return matchesStatus && matchesSearch;
+      });
+
+      setDashboardViewState("ready");
+      setStatusFilter(nextStatus);
+      setSearchQuery(nextQuery);
+
+      if (matchingApplications.length > 0) {
+        setSelectedApplicationId(matchingApplications[0].id);
+      }
+
+      setToast({
+        kind: "info",
+        message:
+          matchingApplications.length > 0
+            ? `Найдено заявок: ${matchingApplications.length}.`
+            : "По заданным условиям заявки не найдены.",
+      });
+
+      return JSON.stringify({
+        success: true,
+        status: nextStatus,
+        query: nextQuery,
+        matchedCount: matchingApplications.length,
+        matchedApplicationIds: matchingApplications.map(
+          (application) => application.id,
+        ),
+      });
+    },
+  },
+  [applications, searchQuery, statusFilter],
+);
 
 const newApplicationsCount = applications.filter(
   (application) => application.status === "new",
