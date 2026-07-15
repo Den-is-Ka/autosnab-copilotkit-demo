@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  DashboardEmptyState,
+  DashboardErrorState,
+  DashboardLoadingState,
+} from "@/components/dashboard_states";
 import { StatusChangeModal } from "@/components/status_change_modal";
 import {
   ToastNotification,
@@ -15,6 +20,8 @@ import type {
 } from "@/types/application";
 
 type StatusFilter = "all" | ApplicationStatus;
+
+type DashboardViewState = "ready" | "loading" | "error" | "empty";
 
 const statusLabels: Record<ApplicationStatus, string> = {
   new: "Новая",
@@ -62,21 +69,26 @@ export function ApplicationsDashboard() {
   const [applications, setApplications] = useState(initialApplications);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
   const [selectedApplicationId, setSelectedApplicationId] = useState(
     initialApplications[0].id,
   );
+
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
-const [pendingStatus, setPendingStatus] = useState<ApplicationStatus>(
-  initialApplications[0].status,
-);
+  const [pendingStatus, setPendingStatus] = useState<ApplicationStatus>(
+    initialApplications[0].status,
+  );
 
-const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-const [toast, setToast] = useState<{
-  message: string;
-  kind: ToastKind;
-} | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    kind: ToastKind;
+  } | null>(null);
+
+  const [dashboardViewState, setDashboardViewState] =
+    useState<DashboardViewState>("ready");
 
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -155,7 +167,52 @@ async function handleConfirmStatusChange() {
     message: `Статус заявки #${applicationId} изменён: «${statusLabels[previousStatus]}» → «${statusLabels[pendingStatus]}».`,
   });
 }
+async function handleSimulateLoading() {
+  setDashboardViewState("loading");
 
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 1200);
+  });
+
+  setDashboardViewState("ready");
+
+  setToast({
+    kind: "info",
+    message: "Данные заявок успешно загружены.",
+  });
+}
+
+function handleSimulateError() {
+  setDashboardViewState("error");
+}
+
+function handleSimulateEmptyState() {
+  setDashboardViewState("empty");
+}
+
+async function handleRetryDashboard() {
+  setDashboardViewState("loading");
+
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 1200);
+  });
+
+  setDashboardViewState("ready");
+
+  setToast({
+    kind: "success",
+    message: "Соединение восстановлено. Заявки снова доступны.",
+  });
+}
+
+function handleRestoreDashboard() {
+  setDashboardViewState("ready");
+
+  setToast({
+    kind: "success",
+    message: "Демонстрационные заявки восстановлены.",
+  });
+}
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="grid min-h-screen lg:grid-cols-[250px_minmax(0,1fr)]">
@@ -233,7 +290,63 @@ async function handleConfirmStatusChange() {
             </div>
           </header>
 
-          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <section className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">
+                Демонстрация состояний
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Проверка загрузки, ошибки и отсутствия данных.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleSimulateLoading}
+                disabled={dashboardViewState === "loading"}
+                className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-xs font-medium text-cyan-200 transition hover:bg-cyan-400/10 disabled:cursor-wait disabled:opacity-50"
+              >
+                Загрузка
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSimulateError}
+                disabled={dashboardViewState === "loading"}
+                className="rounded-lg border border-rose-400/20 bg-rose-400/5 px-3 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-400/10 disabled:opacity-50"
+              >
+                Ошибка
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSimulateEmptyState}
+                disabled={dashboardViewState === "loading"}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+              >
+                Пустой список
+              </button>
+            </div>
+          </section>
+
+                    {dashboardViewState === "loading" ? (
+            <DashboardLoadingState />
+          ) : null}
+
+          {dashboardViewState === "error" ? (
+            <DashboardErrorState onRetry={handleRetryDashboard} />
+          ) : null}
+
+          {dashboardViewState === "empty" ? (
+            <DashboardEmptyState onRestore={handleRestoreDashboard} />
+          ) : null}
+
+          <section className={`mt-6 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${
+                                dashboardViewState === "ready" ? "grid" : "hidden"
+                              }`}
+                            >
             <article className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-400">Всего заявок</p>
               <p className="mt-3 text-3xl font-bold text-white">
@@ -258,7 +371,10 @@ async function handleConfirmStatusChange() {
             </article>
           </section>
 
-          <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+          <section className={`mt-6 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] ${
+                    dashboardViewState === "ready" ? "grid" : "hidden"
+                  }`}
+                >
             <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5">
               <div className="grid gap-3 border-b border-white/10 p-4 sm:grid-cols-[minmax(0,1fr)_220px]">
                 <label>
