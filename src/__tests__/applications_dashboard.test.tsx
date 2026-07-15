@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApplicationsDashboard } from "@/components/applications_dashboard";
+import { initialApplications } from "@/data/applications";
 
 vi.mock("@copilotkit/react-core/v2", () => ({
   useAgentContext: vi.fn(),
@@ -41,3 +43,28 @@ describe("ApplicationsDashboard", () => {
     ).toBeInTheDocument();
   });
 });
+    it("фильтрует заявки по выбранному статусу", async () => {
+      const user = userEvent.setup();
+
+      render(<ApplicationsDashboard />);
+
+      const statusSelect = screen.getByRole("combobox", {
+        name: "Фильтр по статусу",
+      });
+
+      await user.selectOptions(statusSelect, "approved");
+
+      expect(statusSelect).toHaveValue("approved");
+
+      for (const application of initialApplications) {
+        const applicationButton = screen.queryByRole("button", {
+          name: new RegExp(`#${application.id}\\b`),
+        });
+
+        if (application.status === "approved") {
+          expect(applicationButton).toBeInTheDocument();
+        } else {
+          expect(applicationButton).not.toBeInTheDocument();
+        }
+      }
+    });
