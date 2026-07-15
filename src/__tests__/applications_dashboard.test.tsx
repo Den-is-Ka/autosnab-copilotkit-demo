@@ -45,74 +45,150 @@ describe("ApplicationsDashboard", () => {
   });
 
   it("AI-инструмент filterApplications фильтрует заявки", async () => {
-  const approvedApplications = initialApplications.filter(
-    (application) => application.status === "approved",
-  );
+    const approvedApplications = initialApplications.filter(
+      (application) => application.status === "approved",
+    );
 
-  expect(approvedApplications.length).toBeGreaterThan(0);
+    expect(approvedApplications.length).toBeGreaterThan(0);
 
-  render(<ApplicationsDashboard />);
+    render(<ApplicationsDashboard />);
 
-  const filterTool = frontendTools.get("filterApplications");
+    const filterTool = frontendTools.get("filterApplications");
 
-  expect(filterTool).toBeDefined();
+    expect(filterTool).toBeDefined();
 
-  let toolResult = "";
+    let toolResult = "";
 
-  await act(async () => {
-    toolResult = await filterTool!.handler({
+    await act(async () => {
+      toolResult = await filterTool!.handler({
+        status: "approved",
+        query: "",
+      });
+    });
+
+    const parsedResult = JSON.parse(toolResult) as {
+      success: boolean;
+      status: string;
+      query: string;
+      matchedCount: number;
+      matchedApplicationIds: number[];
+    };
+
+    expect(parsedResult).toEqual({
+      success: true,
       status: "approved",
       query: "",
-    });
-  });
-
-  const parsedResult = JSON.parse(toolResult) as {
-    success: boolean;
-    status: string;
-    query: string;
-    matchedCount: number;
-    matchedApplicationIds: number[];
-  };
-
-  expect(parsedResult).toEqual({
-    success: true,
-    status: "approved",
-    query: "",
-    matchedCount: approvedApplications.length,
-    matchedApplicationIds: approvedApplications.map(
-      (application) => application.id,
-    ),
-  });
-
-  const statusSelect = screen.getByRole("combobox", {
-    name: "Фильтр по статусу",
-  });
-
-  expect(statusSelect).toHaveValue("approved");
-
-  for (const application of initialApplications) {
-    const applicationButton = screen.queryByRole("button", {
-      name: new RegExp(`#${application.id}\\b`),
+      matchedCount: approvedApplications.length,
+      matchedApplicationIds: approvedApplications.map(
+        (application) => application.id,
+      ),
     });
 
-    if (application.status === "approved") {
-      expect(applicationButton).toBeInTheDocument();
-    } else {
-      expect(applicationButton).not.toBeInTheDocument();
+    const statusSelect = screen.getByRole("combobox", {
+      name: "Фильтр по статусу",
+    });
+
+    expect(statusSelect).toHaveValue("approved");
+
+    for (const application of initialApplications) {
+      const applicationButton = screen.queryByRole("button", {
+        name: new RegExp(`#${application.id}\\b`),
+      });
+
+      if (application.status === "approved") {
+        expect(applicationButton).toBeInTheDocument();
+      } else {
+        expect(applicationButton).not.toBeInTheDocument();
+      }
     }
-  }
 
-  const firstApprovedApplication = approvedApplications[0];
+    const firstApprovedApplication = approvedApplications[0];
 
-  const firstApprovedButton = screen.getByRole("button", {
-    name: new RegExp(`#${firstApprovedApplication.id}\\b`),
+    const firstApprovedButton = screen.getByRole("button", {
+      name: new RegExp(`#${firstApprovedApplication.id}\\b`),
+    });
+
+    expect(firstApprovedButton).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
-  expect(firstApprovedButton).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-});
+  it("AI-инструмент selectApplication открывает указанную заявку", async () => {
+    const user = userEvent.setup();
+    const targetApplication = initialApplications[1];
+
+    render(<ApplicationsDashboard />);
+
+    const searchInput = screen.getByPlaceholderText(
+      "Поиск по клиенту, компании или номеру",
+    );
+
+    const statusSelect = screen.getByRole("combobox", {
+      name: "Фильтр по статусу",
+    });
+
+    await user.type(searchInput, "несуществующая заявка");
+    await user.selectOptions(statusSelect, "rejected");
+
+    expect(searchInput).toHaveValue("несуществующая заявка");
+    expect(statusSelect).toHaveValue("rejected");
+
+    const selectTool = frontendTools.get("selectApplication");
+
+    expect(selectTool).toBeDefined();
+
+    let toolResult = "";
+
+    await act(async () => {
+      toolResult = await selectTool!.handler({
+        applicationId: targetApplication.id,
+      });
+    });
+
+    const parsedResult = JSON.parse(toolResult) as {
+      success: boolean;
+      selectedApplication: {
+        id: number;
+        customerName: string;
+        email: string;
+        phone: string;
+      };
+    };
+
+    expect(parsedResult.success).toBe(true);
+
+    expect(parsedResult.selectedApplication).toMatchObject({
+      id: targetApplication.id,
+      customerName: targetApplication.customerName,
+      email: targetApplication.email,
+      phone: targetApplication.phone,
+    });
+
+    expect(searchInput).toHaveValue("");
+    expect(statusSelect).toHaveValue("all");
+
+    const applicationButton = screen.getByRole("button", {
+      name: new RegExp(`#${targetApplication.id}\\b`),
+    });
+
+    expect(applicationButton).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    expect(
+      screen.getByText(`Заявка #${targetApplication.id}`),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(targetApplication.email),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(targetApplication.phone),
+    ).toBeInTheDocument();
+  });
 
   it("показывает заголовок и основные элементы панели заявок", () => {
     render(<ApplicationsDashboard />);
