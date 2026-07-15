@@ -335,6 +335,90 @@ useFrontendTool(
   [applications],
 );
 
+useFrontendTool(
+  {
+    name: "requestStatusChange",
+    description:
+      "Подготавливает изменение статуса заявки и открывает пользователю окно подтверждения. Инструмент никогда не изменяет статус самостоятельно.",
+
+    parameters: z.object({
+      applicationId: z
+        .number()
+        .int()
+        .positive()
+        .describe("Числовой идентификатор заявки"),
+
+      nextStatus: z
+        .enum(["new", "in_review", "approved", "rejected"])
+        .describe(
+          "Предлагаемый новый статус: new, in_review, approved или rejected",
+        ),
+    }),
+
+    handler: async ({ applicationId, nextStatus }) => {
+      const application = applications.find(
+        (item) => item.id === applicationId,
+      );
+
+      if (!application) {
+        setToast({
+          kind: "error",
+          message: `Заявка #${applicationId} не найдена.`,
+        });
+
+        return JSON.stringify({
+          success: false,
+          applicationId,
+          error: "Application not found",
+        });
+      }
+
+      if (application.status === nextStatus) {
+        setDashboardViewState("ready");
+        setStatusFilter("all");
+        setSearchQuery("");
+        setSelectedApplicationId(application.id);
+
+        setToast({
+          kind: "info",
+          message: `Заявка #${application.id} уже имеет статус «${statusLabels[nextStatus]}».`,
+        });
+
+        return JSON.stringify({
+          success: false,
+          applicationId: application.id,
+          currentStatus: application.status,
+          requestedStatus: nextStatus,
+          error: "Application already has requested status",
+        });
+      }
+
+      setDashboardViewState("ready");
+      setStatusFilter("all");
+      setSearchQuery("");
+      setSelectedApplicationId(application.id);
+
+      setPendingStatus(nextStatus);
+      setIsStatusModalOpen(true);
+
+      setToast({
+        kind: "info",
+        message: `AI предлагает изменить статус заявки #${application.id}. Требуется подтверждение пользователя.`,
+      });
+
+      return JSON.stringify({
+        success: true,
+        confirmationRequired: true,
+        applicationId: application.id,
+        customerName: application.customerName,
+        currentStatus: application.status,
+        requestedStatus: nextStatus,
+      });
+    },
+  },
+  [applications],
+);
+
 const newApplicationsCount = applications.filter(
   (application) => application.status === "new",
 ).length;
