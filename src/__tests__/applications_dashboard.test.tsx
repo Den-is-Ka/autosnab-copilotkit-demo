@@ -190,6 +190,110 @@ describe("ApplicationsDashboard", () => {
     ).toBeInTheDocument();
   });
 
+  it("AI-инструмент requestStatusChange требует подтверждение пользователя", async () => {
+  const targetApplication = initialApplications[1];
+
+  const nextStatus =
+    targetApplication.status === "approved"
+      ? "rejected"
+      : "approved";
+
+  const currentStatusLabel =
+    targetApplication.status === "new"
+      ? "Новая"
+      : targetApplication.status === "in_review"
+        ? "На рассмотрении"
+        : targetApplication.status === "approved"
+          ? "Одобрена"
+          : "Отклонена";
+
+  const nextStatusLabel =
+    nextStatus === "approved" ? "Одобрена" : "Отклонена";
+
+  render(<ApplicationsDashboard />);
+
+  const requestTool = frontendTools.get(
+    "requestStatusChange",
+  );
+
+  expect(requestTool).toBeDefined();
+
+  let toolResult = "";
+
+  await act(async () => {
+    toolResult = await requestTool!.handler({
+      applicationId: targetApplication.id,
+      nextStatus,
+    });
+  });
+
+  const parsedResult = JSON.parse(toolResult) as {
+    success: boolean;
+    confirmationRequired: boolean;
+    applicationId: number;
+    customerName: string;
+    currentStatus: string;
+    requestedStatus: string;
+  };
+
+  expect(parsedResult).toEqual({
+    success: true,
+    confirmationRequired: true,
+    applicationId: targetApplication.id,
+    customerName: targetApplication.customerName,
+    currentStatus: targetApplication.status,
+    requestedStatus: nextStatus,
+  });
+
+  const dialog = screen.getByRole("dialog", {
+    name: "Изменить статус заявки",
+  });
+
+  expect(dialog).toBeInTheDocument();
+
+  expect(
+    within(dialog).getByText(
+      `Заявка #${targetApplication.id}`,
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    within(dialog).getByText(targetApplication.customerName),
+  ).toBeInTheDocument();
+
+  const modalStatusSelect = within(dialog).getByRole(
+    "combobox",
+    {
+      name: "Новый статус",
+    },
+  );
+
+  expect(modalStatusSelect).toHaveValue(nextStatus);
+
+  const confirmButton = within(dialog).getByRole("button", {
+    name: "Подтвердить изменение",
+  });
+
+  expect(confirmButton).toBeEnabled();
+
+  const applicationButton = screen.getByRole("button", {
+    name: new RegExp(`#${targetApplication.id}\\b`),
+  });
+
+  expect(applicationButton).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  expect(
+    within(applicationButton).getByText(currentStatusLabel),
+  ).toBeInTheDocument();
+
+  expect(
+    within(applicationButton).queryByText(nextStatusLabel),
+  ).not.toBeInTheDocument();
+});
+
   it("показывает заголовок и основные элементы панели заявок", () => {
     render(<ApplicationsDashboard />);
 
